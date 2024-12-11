@@ -1,28 +1,36 @@
 require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
-const morgan = require('morgan');
-const sequelize = require('./models'); // Conexión a Sequelize
-const cursoRoutes = require('./routes/cursos');
+const helmet = require('helmet'); // Para mayor seguridad
+const rateLimit = require('express-rate-limit'); // Para limitar solicitudes
+const sequelize = require('./models');
+const userRoutes = require('./routes/userRoutes');
+const authRoutes = require('./routes/authRoutes');
+const swaggerUi = require('swagger-ui-express');
+const swaggerDocs = require('./swagger');
+
+
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 const app = express();
 
-// Middleware
-app.use(cors());
-app.use(morgan('dev'));
+// Middleware de seguridad
+app.use(helmet()); // Configura encabezados de seguridad
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutos
+    max: 100, // Máximo 100 solicitudes por IP
+  })
+);
+
+// Middleware para manejar JSON
 app.use(express.json());
 
 // Rutas
-app.use('/api/cursos', cursoRoutes);
+app.use('/api/auth', authRoutes); // Autenticación
+app.use('/api/users', userRoutes); // Usuarios
 
-// Sincroniza Sequelize y levanta el servidor
+// Sincronizar base de datos y levantar el servidor
 const PORT = process.env.PORT || 8080;
-
-sequelize
-  .sync({ force: false }) // Cambiar a true si quieres reiniciar las tablas
-  .then(() => {
-    app.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`));
-  })
-  .catch((error) => {
-    console.error('Error al conectar con la base de datos:', error);
-  });
+sequelize.sync({ force: false }).then(() => {
+  app.listen(PORT, () => console.log(`Servidor corriendo en http://localhost:${PORT}`));
+});
